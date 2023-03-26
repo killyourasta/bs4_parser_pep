@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 from tqdm import tqdm
 
 from configs import configure_argument_parser, configure_logging
-from constants import BASE_DIR, MAIN_DOC_URL, MAIN_PEP_URL, EXPECTED_STATUS
+from constants import BASE_DIR, EXPECTED_STATUS, MAIN_DOC_URL, MAIN_PEP_URL
 from outputs import control_output
 from utils import find_tag, get_response
 
@@ -17,8 +17,6 @@ from utils import find_tag, get_response
 def whats_new(session):
     whats_new_url = urljoin(MAIN_DOC_URL, 'whatsnew/')
     response = get_response(session, whats_new_url)
-    if response is None:
-        return
     soup = BeautifulSoup(response.text, features='lxml')
 
     main_div = find_tag(soup, 'section', attrs={'id': 'what-s-new-in-python'})
@@ -30,14 +28,14 @@ def whats_new(session):
     sections_by_python = div_with_ul.find_all(
         'li', attrs={'class': 'toctree-l1'}
     )
-    results = [('Ссылка на статью', 'Заголовок', 'Редактор, Автор')]
+    first_row = ('Ссылка на статью', 'Заголовок', 'Редактор, Автор')
+    results = []
+    results.append(first_row)
     for section in tqdm(sections_by_python):
         version_a_tag = section.find('a')
         href = version_a_tag['href']
         version_link = urljoin(whats_new_url, href)
         response = get_response(session, version_link)
-        if response is None:
-            continue
         soup = BeautifulSoup(response.text, 'lxml')
         h1 = find_tag(soup, 'h1')
         dl = find_tag(soup, 'dl')
@@ -51,8 +49,6 @@ def whats_new(session):
 
 def latest_versions(session):
     response = get_response(session, MAIN_DOC_URL)
-    if response is None:
-        return
     soup = BeautifulSoup(response.text, 'lxml')
     sidebar = find_tag(soup, 'div', attrs={'class': 'sphinxsidebarwrapper'})
     ul_tags = sidebar.find_all('ul')
@@ -63,11 +59,13 @@ def latest_versions(session):
     else:
         raise Exception('Не найден список c версиями Python')
 
-    results = [('Ссылка на документацию', 'Версия', 'Статус')]
-    pattern = r'Python (?P<version>\d\.\d+) \((?P<status>.*)\)'
+    f_row = ('Ссылка на документацию', 'Версия', 'Статус')
+    results = []
+    results.append(f_row)
+    PATTERN = r'Python (?P<version>\d\.\d+) \((?P<status>.*)\)'
     for a_tag in a_tags:
         link = a_tag['href']
-        text_match = re.search(pattern, a_tag.text)
+        text_match = re.search(PATTERN, a_tag.text)
         if text_match is not None:
             version, status = text_match.groups()
         else:
@@ -81,8 +79,6 @@ def latest_versions(session):
 def download(session):
     downloads_url = urljoin(MAIN_DOC_URL, 'download.html')
     response = get_response(session, downloads_url)
-    if response is None:
-        return
     soup = BeautifulSoup(response.text, 'lxml')
 
     main_tag = find_tag(soup, 'div', {'role': 'main'})
@@ -94,9 +90,9 @@ def download(session):
     archive_url = urljoin(downloads_url, pdf_a4_link)
     filename = archive_url.split('/')[-1]
 
-    downloads_dir = BASE_DIR / 'downloads'
-    downloads_dir.mkdir(exist_ok=True)
-    archive_path = downloads_dir / filename
+    DOWNLOADS_DIR = BASE_DIR / 'downloads'
+    DOWNLOADS_DIR.mkdir(exist_ok=True)
+    archive_path = DOWNLOADS_DIR / filename
     response = session.get(archive_url)
 
     with open(archive_path, 'wb') as file:
@@ -165,7 +161,7 @@ def main():
         session.cache.clear()
     parser_mode = args.mode
     results = MODE_TO_FUNCTION[parser_mode](session)
-    if results:
+    if results is not None:
         control_output(results, args)
 
     logging.info('Парсер завершил работу.')

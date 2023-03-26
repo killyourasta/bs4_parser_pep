@@ -2,12 +2,16 @@ import logging
 
 from requests import RequestException
 
-from exceptions import ParserFindTagException
+from exceptions import NoResponseException, ParserFindTagException
 
 
 def get_response(session, url):
     try:
         response = session.get(url)
+        if response is None:
+            error_msg = f'Нет ответа от страницы {url}'
+            logging.error(error_msg)
+            raise NoResponseException(error_msg)
         response.encoding = 'utf-8'
         return response
     except RequestException:
